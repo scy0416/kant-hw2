@@ -1,0 +1,113 @@
+{
+  "mode": "fixture",
+  "results": [
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: strict 스키마 연결",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 정상, 근거 부족 답변",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 필수 필드, JSON 문법",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 진짜 두 번째 응답으로 복구",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 복구 소진 후 종료",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 오류 종류별 수정 안내",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 문자열 boolean",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 숫자 boolean",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 빈 답변",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 없는 출처",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 중복 출처",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 근거 없이 담당자 불필요",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 추가 필드",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 없는 category",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 숫자 출처",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 거절",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: 불완전",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "answer",
+      "name": "답변 검증과 수정: API 실패",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    }
+  ]
+}

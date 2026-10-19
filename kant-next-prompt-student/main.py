@@ -89,7 +89,12 @@ def build_instructions(documents, variant):
 
 # 필수 2 / 답변 검증과 수정. 스키마를 만든 뒤 값과 출처를 검사합니다.
 def answer_format():
-    properties = _todo("답변 검증과 수정: answer, source_ids, needs_human, category의 JSON Schema 속성 dict")
+    properties = {
+        "answer": {"type": "string"},
+        "source_ids": {"type": "array", "items": {"type": "string"}},
+        "needs_human": {"type": "boolean"},
+        "category": {"type": "string", "enum": ["installation", "access", "incident", "general"]},
+    }
     schema = {"type": "object", "properties": properties,
               "required": ["answer", "source_ids", "needs_human", "category"],
               "additionalProperties": False}
@@ -100,12 +105,16 @@ def answer_format():
 def validate_answer(raw, known_ids):
     answer = json.loads(raw)
     Draft202012Validator(answer_format()["format"]["schema"]).validate(answer)
+    # ==========================================================
     # 이유: 스키마를 통과해도 출처와 답변 본문을 따로 확인하는 이유를 적으세요.
+    # ==========================================================
+    # 스키마는 데이터의 구조에 대한 유효성 검증일 뿐 내용의 검증은 아니기 때문이다.
+    # ==========================================================
     rules = [
-        (_todo("답변 검증과 수정: answer가 공백뿐인지 판정하는 조건"), "blank answer"),
-        (_todo("답변 검증과 수정: source_ids에 known_ids 밖의 값이 있는지 판정하는 조건"), "unknown source_id"),
-        (_todo("답변 검증과 수정: source_ids에 중복이 있는지 판정하는 조건"), "duplicate source_id"),
-        (_todo("답변 검증과 수정: 출처가 없는데 needs_human도 False인지 판정하는 조건"), "unsupported answer requires human"),
+        (answer["answer"].strip() == "", "blank answer"),
+        (True in [source_id not in known_ids for source_id in answer["source_ids"]], "unknown source_id"),
+        (len(set(answer["source_ids"])) != len(answer["source_ids"]), "duplicate source_id"),
+        (len(answer["source_ids"]) == 0 and not answer["needs_human"], "unsupported answer requires human")
     ]
     for invalid, message in rules:
         if invalid:
@@ -130,7 +139,8 @@ def finish_answer(send, request, response, known_ids, events):
             reason = "refusal"
         else:
             try:
-                answer = _todo("답변 검증과 수정: validate_answer에 응답 본문과 known_ids를 전달하는 호출")
+                #answer = _todo("답변 검증과 수정: validate_answer에 응답 본문과 known_ids를 전달하는 호출")
+                answer = validate_answer(response.get("output_text"), known_ids)
                 return {"answer": answer, "fallback_reason": None, "repair_used": repair_used}
             except (ValueError, ValidationError) as error:
                 error_kind, field = support.validation_detail(error)
@@ -141,10 +151,24 @@ def finish_answer(send, request, response, known_ids, events):
                 else:
                     # 종류: invalid_json, schema_error, blank_answer, unknown_source,
                     # duplicate_source, unsupported_answer. 종류에 맞게 안내를 만드세요.
-                    hint = _todo("답변 검증과 수정: error_kind에 맞는 수정 안내 문자열")
+                    if error_kind == "invalid_json":
+                        hint = "json 형식이 맞지 않습니다. json 형식을 지키세요."
+                    elif error_kind == "schema_error":
+                        hint = "스키마가 옳지 않습니다. 출력 스키마를 확인하세요."
+                    elif error_kind == "blank_answer":
+                        hint = "빈 답변 입니다. 공백이 아닌 답변을 적으세요."
+                    elif error_kind == "unknown_source":
+                        hint = "출처를 알 수 없는 정보입니다. 출처를 알 수 있는 정보를 포함하세요."
+                    elif error_kind == "duplicate_source":
+                        hint = "중복된 정보입니다. 같은 정보는 한 번만 포함하세요."
+                    elif error_kind == "unsupported_answer":
+                        hint = "정보가 없으면서 담당자가 확인하지 않는 지원하지 않는 답변입니다. 정보가 없다면 담당자가 확인해야 합니다."
+                    #hint = _todo("답변 검증과 수정: error_kind에 맞는 수정 안내 문자열")
                     repair_used = True
                     support.append_repair_input(request, response, hint)
-                    response = _todo("답변 검증과 수정: send로 수정 요청을 전송하는 호출")
+                    #response = _todo("답변 검증과 수정: send로 수정 요청을 전송하는 호출")
+                    response = send(request)
+
                     continue
         return {"answer": fallback, "fallback_reason": reason, "repair_used": repair_used}
 
