@@ -344,19 +344,25 @@ def run_pipeline(send, question, documents, tickets, variant="reasoning",
     prices = support.load_prices() if prices is None else prices
     events = []
     started = time.perf_counter()
-    settings = _todo("전체 기능 연결: cache_settings 호출")
+    #settings = _todo("전체 기능 연결: cache_settings 호출")
+    settings = cache_settings(documents, variant)
     request = support.base_request(settings["instructions"], question, variant)
     request.update(settings)
-    request["text"] = _todo("전체 기능 연결: 답변 형식을 만드는 함수 호출")
-    request["tools"] = [_todo("전체 기능 연결: 도구 규격을 만드는 함수 호출")]
+    #request["text"] = _todo("전체 기능 연결: 답변 형식을 만드는 함수 호출")
+    request["text"] = answer_format()
+    #request["tools"] = [_todo("전체 기능 연결: 도구 규격을 만드는 함수 호출")]
+    request["tools"] = [tool_schema()]
     request["parallel_tool_calls"] = False
-    request["input"][0]["content"] = _todo("전체 기능 연결: 질문과 image_path로 입력을 만드는 함수 호출")
+    #request["input"][0]["content"] = _todo("전체 기능 연결: 질문과 image_path로 입력을 만드는 함수 호출")
+    request["input"][0]["content"] = image_content(question, image_path)
 
     def reliable_send(current_request):
         return call_with_retry(send, current_request, events, sleep=sleep)
 
-    final_request, response = _todo("전체 기능 연결: tool_roundtrip에 reliable_send, request, tickets, events 전달")
-    result = _todo("전체 기능 연결: finish_answer에 reliable_send, final_request, response, 문서 ID 집합, events 전달")
+    #final_request, response = _todo("전체 기능 연결: tool_roundtrip에 reliable_send, request, tickets, events 전달")
+    final_request, response = tool_roundtrip(reliable_send, request, tickets, events)
+    #result = _todo("전체 기능 연결: finish_answer에 reliable_send, final_request, response, 문서 ID 집합, events 전달")
+    result = finish_answer(reliable_send, final_request, response, [d["doc_id"] for d in documents], events)
     result["tool_calls"] = sum(event["event"] == "tool_result" for event in events)
     result["logs"] = [usage_record(event, prices) if event["event"] == "api_attempt" else event
                       for event in events]

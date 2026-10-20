@@ -1,0 +1,23 @@
+{
+  "mode": "fixture",
+  "results": [
+    {
+      "stage": "pipeline",
+      "name": "전체 기능 연결: 도구, 이미지, 재시도, 복구, 로그 통합",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "pipeline",
+      "name": "전체 기능 연결: 통합 API 소진 fallback",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "pipeline",
+      "name": "전체 기능 연결: 통합 도구 상한 fallback",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    }
+  ]
+}
