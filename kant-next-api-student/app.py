@@ -121,7 +121,11 @@ def validate_timestamp(value, *, utc=False):
 
 
 def normalize_releases(raw_pages, collected_at):
+    # ==========================================================
     # 작성 메모: 본문 외에 출처와 두 시각을 구분해 남기는 이유를 1~2줄로 적으세요.
+    # ==========================================================
+    # 수집한 자료의 원본 정보(출처, 발행일)을 기록하고, 언제 수집했는지 추적하기 위함이다.
+    # ==========================================================
     # 정제: 플래그 자료형: draft나 prerelease 중 boolean이 아닌 값이 있는지 판단합니다.
     # 정제: 제목 대체: 유효한 name을 쓰고, 비었으면 tag_name을 고릅니다.
     # 정제: 빈 본문: 정리한 body가 빈 문자열인지 판단합니다.
@@ -144,7 +148,7 @@ def normalize_releases(raw_pages, collected_at):
                 reason = "invalid_object"
             elif type(raw_id) is not int or raw_id <= 0 or len(f"release-uv-{raw_id}") > support.LIMITS["doc_id"]:
                 reason = "invalid_id"
-            elif support.todo("정제: 플래그 자료형"):
+            elif not isinstance(item.get("draft"), bool) or not isinstance(item.get("prerelease"), bool):
                 reason = "invalid_flags"
             elif item["draft"] or item["prerelease"]:
                 status = "excluded"
@@ -154,7 +158,7 @@ def normalize_releases(raw_pages, collected_at):
                 if name is not None and not isinstance(name, str):
                     reason = "invalid_name"
                 else:
-                    source_title = support.todo("정제: 제목 대체")
+                    source_title = name.strip() if isinstance(name, str) and name.strip() else item.get("tag_name")
                     if not isinstance(source_title, str) or not source_title.strip():
                         reason = "missing_title"
                     else:
@@ -168,7 +172,7 @@ def normalize_releases(raw_pages, collected_at):
                         reason = "invalid_body"
                     else:
                         body = clean_text(item["body"])
-                        if support.todo("정제: 빈 본문"):
+                        if body.strip() == "":
                             reason = "empty_body"
                         elif len(body) > support.LIMITS["body"]:
                             reason = "body_too_long"
@@ -182,7 +186,7 @@ def normalize_releases(raw_pages, collected_at):
                         validate_timestamp(published_at)
                     except ValueError:
                         reason = "invalid_published_at"
-                if reason is None and support.todo("정제: 중복 ID"):
+                if reason is None and raw_id in accepted_ids:
                     reason = "duplicate_id"
                 if reason is None:
                     status = "kept"
@@ -190,9 +194,9 @@ def normalize_releases(raw_pages, collected_at):
                     documents.append({
                         "doc_id": f"release-uv-{raw_id}",
                         "title": title,
-                        "body": support.todo("정제: 본문"),
-                        "source_url": support.todo("정제: 출처 URL"),
-                        "collected_at": support.todo("정제: 수집시각"),
+                        "body": body,
+                        "source_url": source_url,
+                        "collected_at": collected_at,
                         "category": "release",
                     })
 
