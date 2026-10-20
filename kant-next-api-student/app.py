@@ -228,12 +228,16 @@ class Document(CourseModel):
     doc_id: DocumentId
     title: str = Field(min_length=1, max_length=support.LIMITS["title"])
     # TODO 문서 API: 문서 모델 필드: title 예시를 따라 body와 source_url의 자료형과 길이를 선언하세요.
+    body: str = Field(min_length=1, max_length=support.LIMITS["body"])
+    source_url: str = Field(min_length=1, max_length=support.LIMITS["source_url"])
     # collected_at은 str, category는 과제 본문의 다섯 값만 허용합니다.
     # 허용 문자열은 Literal["값1", "값2"]처럼 나열할 수 있습니다.
+    collected_at: str = Field()
+    category: Literal["installation", "access", "incident", "general", "release"] = Field()
 
     @model_validator(mode="after")
     def validate_rules(self):
-        support.todo("문서 API: 문서 모델 필드")
+        #support.todo("문서 API: 문서 모델 필드")
         validate_url(self.source_url)
         validate_timestamp(self.collected_at, utc=True)
         return self
@@ -242,11 +246,13 @@ class Document(CourseModel):
 class QueryRequest(CourseModel):
     question: str = Field(min_length=3, max_length=1000)
     # TODO 문서 API: 질문 모델 필드: document_ids는 list[DocumentId], 길이는 1~3입니다.
+    document_ids: list[DocumentId] = Field(min_length=1, max_length=3)
     # session_id는 기본값 "demo"인 str이며 길이는 1~64입니다.
+    session_id: str = Field(min_length=1, max_length=64, default="demo")
 
     @model_validator(mode="after")
     def validate_rules(self):
-        support.todo("문서 API: 질문 모델 필드")
+        #support.todo("문서 API: 질문 모델 필드")
         if len(self.document_ids) != len(set(self.document_ids)):
             raise ValueError("document_ids는 중복될 수 없습니다.")
         return self
@@ -255,11 +261,14 @@ class QueryRequest(CourseModel):
 class QueryReply(CourseModel):
     answer: str = Field(min_length=1)
     # TODO 문서 API: 답변 모델 필드: source_ids는 list[DocumentId], needs_human은 bool입니다.
+    source_ids: list[DocumentId]
+    needs_human: bool
     # category는 답변용 네 값만 허용합니다. Document의 release와 구분하세요.
+    category: Literal["installation", "access", "incident", "general"]
 
     @model_validator(mode="after")
     def validate_rules(self):
-        support.todo("문서 API: 답변 모델 필드")
+        #support.todo("문서 API: 답변 모델 필드")
         if len(self.source_ids) != len(set(self.source_ids)):
             raise ValueError("source_ids는 중복될 수 없습니다.")
         if not self.source_ids and not self.needs_human:
@@ -269,13 +278,20 @@ class QueryReply(CourseModel):
 
 def response_models():
     # 응답 모델: 단건 문서는 Document, 질문 답변은 QueryReply 구조를 사용합니다.
-    return {"documents": list[Document], "document": support.todo("문서 API: 단건 응답 모델"), "query": support.todo("문서 API: 질문 응답 모델")}
+    #return {"documents": list[Document], "document": support.todo("문서 API: 단건 응답 모델"), "query": support.todo("문서 API: 질문 응답 모델")}
+    return {"documents": list[Document], "document": Document, "query": QueryReply}
 
 
 def find_document(store, doc_id):
+    # ==========================================================
     # 작성 메모: GET/POST의 입력 위치와 없는 ID/잘못된 입력의 차이를 1~2줄로 적으세요.
+    # ==========================================================
+    # get요청에서는 입력이 url에 위치하며, post요청에서는 요청의 본문 json에 위치한다.
+    # get에서의 없는 ID나 잘못된 입력은 404오류가 발생하고, post에서는 중복된 ID 또는 잘못된 입력을 하면 422 또는 409 오류가 발생한다.
+    # ==========================================================
     # 문서 API: 없는 문서: store에 doc_id가 없는 경우만 404로 끝냅니다.
-    if support.todo("문서 API: 없는 문서"):
+    #if support.todo("문서 API: 없는 문서"):
+    if doc_id not in store:
         raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
     return store[doc_id]
 
@@ -284,8 +300,10 @@ def register_document(store, document):
     # 문서 API: 중복 ID: document.doc_id가 store에 이미 있는지 확인하세요.
     # 문서 API: 중복 URL: store.values()의 문서 중 source_url이 같은 문서가 있는지 확인하세요.
     # any(조건 for 항목 in 목록)는 조건을 만족하는 항목이 하나라도 있으면 True입니다.
-    duplicate_id = support.todo("문서 API: 중복 ID")
-    duplicate_url = support.todo("문서 API: 중복 URL")
+    #duplicate_id = support.todo("문서 API: 중복 ID")
+    duplicate_id = document.doc_id in store
+    #duplicate_url = support.todo("문서 API: 중복 URL")
+    duplicate_url = any(d.source_url == document.source_url for _, d in store.items())
     if duplicate_id or duplicate_url:
         raise HTTPException(status_code=409, detail="문서 ID 또는 출처 URL이 이미 등록되어 있습니다.")
     store[document.doc_id] = document
