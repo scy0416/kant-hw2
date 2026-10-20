@@ -27,7 +27,11 @@ POLICY_SOURCE = "B1"
 
 # 자료 수집. 원천 수집: 성공한 페이지만 보존하고 실패하면 중단합니다.
 def collect_releases(client, output_dir, *, mode, collected_at, max_pages=2, per_page=5):
+    # ==========================================================
     # 작성 메모: 파일이나 웹 페이지 대신 이 API를 쓰는 이유를 1~2줄로 적으세요.
+    # ==========================================================
+    # API를 통해서 데이터를 요청하는 경우에는 결과 데이터가 구조화되어 있으며, 수집 중 발생할 수 있는 여러 문제를 트래킹하기 간편하다.
+    # ==========================================================
     # 수집: 페이지와 크기: 현재 page와 per_page를 담은 dict. 예: {"키": 변수}.
     # 수집: HTTP 상태 검사: 응답의 HTTP 오류를 확인하는 메서드를 호출하세요.
     # 수집: 다음 페이지 확인: response.links 안에 다음 페이지를 뜻하는 "next"가 있는지 판단하세요.
@@ -55,7 +59,7 @@ def collect_releases(client, output_dir, *, mode, collected_at, max_pages=2, per
         # 새 실행은 예전 성공 파일을 재사용하지 않습니다. 한글도 그대로 저장합니다.
         for name, value in (("raw_pages.json", pages), ("collection_report.json", report)):
             with (output_dir / name).open("w", encoding="utf-8") as stream:
-                json.dump(support.todo("수집: 저장할 데이터"), stream, ensure_ascii=False, indent=2)
+                json.dump(value, stream, ensure_ascii=False, indent=2)
                 stream.write("\n")
 
     save_current_run()
@@ -63,11 +67,11 @@ def collect_releases(client, output_dir, *, mode, collected_at, max_pages=2, per
         try:
             response = client.get(
                 support.GITHUB_URL,
-                params=support.todo("수집: 페이지와 크기"),
+                params={"page": page, "per_page": per_page},
                 headers=support.GITHUB_HEADERS,
                 timeout=httpx.Timeout(15.0, connect=5.0),
             )
-            support.todo("수집: HTTP 상태 검사")  # response.raise_for_status
+            response.raise_for_status()
             items = response.json()
             if not isinstance(items, list):
                 raise ValueError("JSON 응답이 배열이 아닙니다.")
@@ -92,7 +96,7 @@ def collect_releases(client, output_dir, *, mode, collected_at, max_pages=2, per
         pages.append({"page": page, "items": items})
         report["successful_pages"] += 1
         report["raw_count"] += len(items)
-        has_next = support.todo("수집: 다음 페이지 확인")
+        has_next = response.links.get("next")
         if not has_next:
             report["success"] = True
             break

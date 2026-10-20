@@ -1,0 +1,11 @@
+{
+  "mode": "live",
+  "source": "https://api.github.com/repos/astral-sh/uv/releases",
+  "collected_at": "2026-10-20T14:39:09.351087Z",
+  "successful_pages": 2,
+  "raw_count": 10,
+  "success": true,
+  "failed_page": null,
+  "limited": true,
+  "error": null
+}
