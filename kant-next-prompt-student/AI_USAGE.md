@@ -25,10 +25,10 @@ AI 답변에 완성 풀이가 포함되었다면 그대로 제출하지 말고, 
 
 AI를 사용하지 않았다면 아래에 `사용하지 않음`이라고 적으세요. 사용했다면 질문별로 행을 추가합니다. API 키와 개인정보를 제외하고, 질문 원문과 받은 설명의 요지를 남깁니다.
 
-- 사용 여부: 사용 (필수 1, 2, 필수 3의 티켓 조회, 오류 화면, 호출 재시도, 사용량과 비용)
+- 사용 여부: 사용 (필수 1, 2, 필수 3의 티켓 조회, 오류 화면, 호출 재시도, 사용량과 비용, 전체 기능 연결)
 - 사용 도구, 모델: Claude Code (Claude Sonnet 5.5, claude-sonnet-5-5)
 
-AI는 문제 분석, 개념 설명, 제가 작성한 초안과 코드의 검토에만 사용했습니다. 프롬프트 문장, `이유:` 주석, 필수 2의 코드(`answer_format`, `validate_answer`, `finish_answer`), 필수 3의 코드(`tool_schema`, `execute_tool`, `tool_roundtrip`, `image_content`, `call_with_retry`, `cache_settings`, `usage_record`)는 AI가 써 주지 않았고, 제가 직접 작성했습니다. AI는 초안에서 빠진 항목, 실행 오류의 원인, 위험한 부분을 지적했고, 저는 그 지적을 보고 직접 고쳤습니다. 이 표는 대화 내용을 바탕으로 AI(Claude Code)가 정리했고, 저는 내용이 사실과 맞는지 확인했습니다. 날짜는 대화 시점을 기준으로 한 것이며 자정을 넘긴 작업은 `10-19~20`으로 적었습니다. 아래 표의 "질문 원문" 중 프롬프트 초안 본문은 `main.py`의 `build_instructions`에 있는 내용과 같아서 생략했습니다.
+AI는 문제 분석, 개념 설명, 제가 작성한 초안과 코드의 검토에만 사용했습니다. 프롬프트 문장, `이유:` 주석, 필수 2의 코드(`answer_format`, `validate_answer`, `finish_answer`), 필수 3의 코드(`tool_schema`, `execute_tool`, `tool_roundtrip`, `image_content`, `call_with_retry`, `cache_settings`, `usage_record`, `run_pipeline`)는 AI가 써 주지 않았고, 제가 직접 작성했습니다. AI는 초안에서 빠진 항목, 실행 오류의 원인, 위험한 부분을 지적했고, 저는 그 지적을 보고 직접 고쳤습니다. 이 표는 대화 내용을 바탕으로 AI(Claude Code)가 정리했고, 저는 내용이 사실과 맞는지 확인했습니다. 날짜는 대화 시점을 기준으로 한 것이며 자정을 넘긴 작업은 `10-19~20`으로 적었습니다. 아래 표의 "질문 원문" 중 프롬프트 초안 본문은 `main.py`의 `build_instructions`에 있는 내용과 같아서 생략했습니다.
 
 | 날짜, 단계 | 질문 원문 | 받은 설명의 요지 | 직접 수정한 파일, 함수와 이유 | 다시 실행한 검사, 결과 |
 |---|---|---|---|---|
@@ -61,6 +61,10 @@ AI는 문제 분석, 개념 설명, 제가 작성한 초안과 코드의 검토�
 | 2026-10-20, 필수 3 사용량과 비용 | 사용량과 비용에서 cache_settings를 구현해봤는데 이게 맞는지 모르겠어 | `build_instructions([], "baseline")`로 문서와 조건을 고정해서 넘기고 있다고 지적함. 문서가 빠지면 모델이 근거를 볼 수 없고, `reasoning` 조건이 무시된다고 설명함. 문서 목록은 요청마다 바뀌지 않는 고정 입력이라 캐시 키에 안전하다고 설명함. | `cache_settings`: `build_instructions`에 받은 `documents`와 `variant`를 전달하도록 직접 수정. | `check usage` 첫 항목(고정 prefix) 통과 |
 | 2026-10-20, 필수 3 사용량과 비용 | usage_record를 구현해봤는데 어딘가가 틀렸어. 어디가 틀린건지 알려줘 | AI가 `check usage`를 실행해 두 항목 실패를 확인함. 일반 입력에서 캐시 쓰기를 빼지 않았고, 비용식에 단가를 곱하지 않았으며, `if not cached`가 0과 `None`을 구분하지 못한다고 설명함. 코드는 제공하지 않음. | `usage_record`: 토큰 읽기, 일반 입력, 비용식, 캐시 관측 상태를 직접 작성하고 수정. 디버깅용 `print` 제거. | `check usage` 6개 중 4개 → 6개 통과 |
 | 2026-10-20, 필수 3 사용량과 비용 | 바꿨는데 제대로 동작하는지 확인해줘 | 일반 입력 산식, 항목별 단가 곱, 관측 상태 분기가 맞다고 확인함. `이유:` 주석에 두 요청의 비용과 지연 차이를 캐시 효과로 단정할 수 없는 이유가 빠졌다고 알림. | `usage_record`의 `이유:` 주석 일부 작성. 관측값 해석은 `run usage --live` 후에 적을 예정. | `check usage` 6개 중 6개 통과. `run usage --live`는 아직 실행하지 않음. |
+| 2026-10-20, 필수 3 진행 확인 | 다른 곳에서 진행한 사항을 확인해봐 | AI가 커밋 기록, `main.py`, `artifacts/`를 읽고 단계별 `check`를 다시 실행해 진행 상황을 정리함. 티켓 조회, 오류 화면, 재시도, 사용량과 비용은 `check`가 모두 통과하고, `run tools --live`(Q08)와 `run image --live`(Q10)의 결과가 기대와 맞음을 확인함. 전체 기능 연결은 `settings`를 정의하지 않아 `NameError`로 `check pipeline`이 0/3이라고 알림. `tool_roundtrip`의 "서버가 실행한다" 표현이 모호하고, `usage_record` 주석에 관측값이 없다고 지적함. | 수정 없음 | `check tools` 5/5, `check image` 1/1, `check retry` 11/11, `check usage` 6/6, `check pipeline` 0/3 |
+| 2026-10-20, 필수 3 전체 연결 | 해봤는데 어딘가에서 문제가 발생했어. 어디인지 확인해봐줘 | `run_pipeline`의 세 줄을 지적함. `finish_answer`의 네 번째 인자에 문서 ID 집합이 아니라 `documents`를 넘겨 모든 출처가 없는 출처로 판정된다는 것(`check pipeline` 실패 원인), `request["text"]`에 답변 형식이 아니라 `build_instructions`를 호출한 것, `request["tools"]`에서 리스트 대괄호가 빠진 것. 뒤의 둘은 fixture 검사에 걸리지 않고 live에서만 문제가 된다고 설명함. 코드는 제공하지 않음. | `run_pipeline`: 일곱 곳의 `_todo`를 직접 작성하고, 지적받은 세 줄을 직접 수정. | `check pipeline` 1/3 → 3/3 |
+| 2026-10-20, 필수 3 전체 연결 | 고치고 라이브까지 실행해봤는데 전부 문제가 없었는지도 확인해줘 | 세 곳이 모두 고쳐진 것을 확인함. `run pipeline --live`(Q01, Q07, Q10)가 기대와 일치함을 확인함. Q07은 도구 호출 1회와 `needs_human=true`로 복구 시각을 만들지 않음. 로그의 `estimated_cost_usd`를 입력 2114, 캐시 쓰기 2111, 출력 81로 직접 계산해 0.00062555와 일치함을 확인함. `check all` 45/45 통과도 확인함. `usage_record` 주석에 `run-usage-live.json`의 관측값을 넣어야 한다고 알림. | `run_pipeline`의 세 줄 직접 수정(위 행). | `check all` 45/45, `run pipeline --live` 3건 정상 |
+| 2026-10-20, 기록 정리 | 다 했으니까 AI사용 기록 작성해줘 | 필수 3 후반부와 이번 행의 기록을 AI가 정리함. 정리 중 AI가 `compare-live.json`의 26개 기록을 `evaluation_cases.json`의 기대값과 대조해, Q03(최신 릴리스 적용)이 baseline과 reasoning 두 조건에서 `needs_human`을 `true`로 낸 것(기대 `false`)을 확인함. `main.py`에 마지막 비교의 이유 주석(사례 이름, 바꾼 이유, 결과, 남은 한계)이 아직 없다고 알림. | `AI_USAGE.md`: 사용 범위 문구에 전체 기능 연결 반영, 행 추가. | 실행 없음 (비교 결과는 읽기만 함) |
 
 ## 제출 전 확인
 
