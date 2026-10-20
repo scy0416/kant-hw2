@@ -1,0 +1,41 @@
+{
+  "mode": "fixture",
+  "results": [
+    {
+      "stage": "usage",
+      "name": "사용량과 비용: 고정 prefix, 정책 변경 버전",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "usage",
+      "name": "사용량과 비용: 캐시 read/write, 비용",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "usage",
+      "name": "사용량과 비용: 관측된 0, 미관측, 실패 구분",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "usage",
+      "name": "사용량과 비용: 잘못된 계량 거부",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "usage",
+      "name": "사용량과 비용: 일부 계량 누락 시에도 모순 거부",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "usage",
+      "name": "사용량과 비용: 제공 가격 범위 경계",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    }
+  ]
+}

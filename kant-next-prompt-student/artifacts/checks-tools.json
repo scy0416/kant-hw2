@@ -1,0 +1,35 @@
+{
+  "mode": "fixture",
+  "results": [
+    {
+      "stage": "tools",
+      "name": "티켓 조회: 도구 스키마",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "tools",
+      "name": "티켓 조회: 허용 인자, 읽기 전용 조회",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "tools",
+      "name": "티켓 조회: reasoning, call_id 왕복",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "tools",
+      "name": "티켓 조회: 도구 왕복 상한",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "tools",
+      "name": "티켓 조회: 여러 호출과 도구 오류 연결",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    }
+  ]
+}

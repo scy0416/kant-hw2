@@ -1,0 +1,11 @@
+{
+  "mode": "fixture",
+  "results": [
+    {
+      "stage": "image",
+      "name": "오류 화면 입력: 텍스트, 실제 PNG 결합",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    }
+  ]
+}

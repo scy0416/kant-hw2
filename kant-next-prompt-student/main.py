@@ -53,6 +53,9 @@ def build_instructions(documents, variant):
         문서에 없는 정보를 요구하는 경우에는 담당자 확인으로 안내하세요.
         자체적으로 해결할 수 없는 담당자가 필요한 요청은 담당자 확인으로 안내하세요.
         자체적으로 해결할 수 있는 요청에는 담당자 확인이 필요 없습니다.
+        오류가 발생하였고, 이미지가 첨부되었을 때, 화면에 실제로 보이는 것을 관찰하고 서술하세요.
+        오류가 발생하였고, 이미지가 첨부되었을 때, 화면에 보이지 않는 것을 유추하고 단정하지 마세요.
+        인증 설정과 접근 권한에 대한 문제는 담당자 확인으로 안내하세요.
         보안 및 권한 접근관련 요청이 사람의 조치가 필요한 문제인 경우 일반적인 절차와 함께 담당자 확인으로 안내하고, 사람의 조치가 필요없으면 담당자 확인으로 안내하지 않습니다.
     </IMPORTANT>
     <SUCCESS>
@@ -175,18 +178,33 @@ def finish_answer(send, request, response, known_ids, events):
 
 # 필수 3 / 티켓 조회. 티켓 조회 조건과 모델에 돌려줄 값을 정합니다.
 def tool_schema():
-    parameters = _todo("티켓 조회: ticket_id 하나만 받는 object JSON Schema")
+    #parameters = _todo("티켓 조회: ticket_id 하나만 받는 object JSON Schema")
+    parameters = {
+        "type": "object",
+        "properties": {
+            "ticket_id": {
+                "type": "string",               # 문자열
+                "pattern": r"^IT-[0-9]{4}$",    # 패턴
+            }
+        },
+        "required": ["ticket_id"],              # 필수 값
+        "additionalProperties": False           # 추가 인자 금지
+    }
     return {"type": "function", "name": "lookup_ticket", "strict": True,
             "description": "기존 티켓의 상태를 읽습니다. 티켓을 변경하지 않습니다.",
             "parameters": parameters}
 
 
 def execute_tool(name, arguments, tickets):
-    if _todo("티켓 조회: 허용하지 않은 함수 이름인지 판정하는 조건"):
+    if name != "lookup_ticket":
         return {"ok": False, "error": "unknown_tool"}
     try:
         args = json.loads(arguments)
-        if _todo("티켓 조회: args가 dict가 아니거나 키가 ticket_id 하나가 아닌 조건. 키 누락도 포함"):
+        # 딕셔너리인가
+        # ticket_id가 존재하는가
+        # list가 아닌가
+        # ticket_id 외의 인자가 존재하는가
+        if not isinstance(args, dict) or "ticket_id" not in args or isinstance(args["ticket_id"], list) or len(args) > 1:
             raise ValueError("unexpected arguments")
         ticket_id = args["ticket_id"]
         if not isinstance(ticket_id, str) or not re.fullmatch(r"IT-[0-9]{4}", ticket_id):
@@ -195,7 +213,7 @@ def execute_tool(name, arguments, tickets):
         return {"ok": False, "error": "invalid_arguments"}
     if ticket_id not in tickets:
         return {"ok": False, "error": "not_found", "ticket_id": ticket_id}
-    return {"ok": True, "ticket": _todo("티켓 조회: tickets에서 찾은 티켓의 사본")}
+    return {"ok": True, "ticket": copy.deepcopy(tickets.get(ticket_id))}
 
 
 def tool_roundtrip(send, request, tickets, events):
@@ -208,16 +226,21 @@ def tool_roundtrip(send, request, tickets, events):
         calls = [item for item in output if item.get("type") == "function_call"]
         if not calls:
             return request, response
+        # ==========================================================
         # 이유: 모델이 요청한 도구를 누가 실행하며 call_id를 왜 유지하는지 적으세요.
-        request["input"].extend(_todo("티켓 조회: 이번 모델의 output 전체 사본"))
+        # ==========================================================
+        # 모델이 요청한 도구는 서버(도구를 가진 주체)가 실행한다.
+        # call_id는 기록을 추적하고 여러 도구의 결과를 알맞는 도구와 짝지어주기 위해서 필요하다.
+        # ==========================================================
+        request["input"].extend(copy.deepcopy(output))
         for call in calls:
             if not isinstance(call.get("call_id"), str) or not call["call_id"]:
                 return request, {"status": "incomplete", "output": []}
-            result = _todo("티켓 조회: execute_tool에 함수 이름, 인자, tickets를 전달하는 호출")
+            result = execute_tool(call["name"], call["arguments"], tickets)
             events.append({"event": "tool_result", "name": call.get("name"),
                            "call_id": call["call_id"], "ok": result["ok"], "error": result.get("error")})
             request["input"].append({"type": "function_call_output",
-                                    "call_id": _todo("티켓 조회: 이번 함수 호출의 연결 ID"),
+                                    "call_id": call["call_id"],
                                     "output": json.dumps(result, ensure_ascii=False)})
     return request, {"status": "round_limit", "output": []}
 
@@ -228,8 +251,16 @@ def image_content(question, image_path):
         raise ValueError("question is empty")
     content = [{"type": "input_text", "text": question}]
     if image_path is not None:
-        content.append(_todo("오류 화면 입력: input_image 항목. support.image_url(image_path), detail='high' 사용"))
+        content.append({
+            "type": "input_image",
+            "image_url": support.image_url(image_path),
+            "detail": "high"
+        })
+    # ==========================================================
     # 이유: 화면에서 본 오류와 실제 장애 원인을 구분해야 하는 이유를 적으세요.
+    # ==========================================================
+    # 이미지를 통해서 오류가 발생했다는 사실을 알 수는 있더라도 그 원인을 단정할 수는 없기 때문에 구분을 해야만 한다.
+    # ==========================================================
     return content
 
 
@@ -241,8 +272,8 @@ def call_with_retry(send, request, events, sleep=time.sleep):
             response = send(request)
         except support.TransportError as error:
             status = error.status_code
-            retryable = _todo("호출 재시도: timeout/connection/408/409/429/5xx만 허용하는 조건")
-            retry_now = _todo("호출 재시도: 다시 시도할 수 있고 아직 3번째 시도가 아닌지 판정하는 조건")
+            retryable = error.kind in ["timeout", "connection"] or status in [408, 409, 429] or 500 <= status <= 599
+            retry_now = retryable and attempt != 3
             delay = support.delay_for(attempt) if retry_now else 0
             support.append_attempt(events, attempt, started, error=error,
                                    retryable=retryable, wait_s=delay)
@@ -252,12 +283,17 @@ def call_with_retry(send, request, events, sleep=time.sleep):
         else:
             support.append_attempt(events, attempt, started, response=response)
             return response
+    # ==========================================================
     # 이유: 출력 수정과 전송 재시도가 다른 이유를 적으세요.
+    # ==========================================================
+    # 출력 수정은 잘못된 출력을 수정하도록 변경사항을 포함해서 재요청을 하는 것이고,
+    # 전송 재시도는 네트워크 오류 등과 같이 일시적인 오류를 회피하기 위해서 이전 요청 그대로 재시도하는 것이다.
+    # ==========================================================
 
 
 # 사용량과 비용. 고정 입력을 연결하고, 토큰을 골라 비용을 계산합니다.
 def cache_settings(documents, variant):
-    instructions = _todo("사용량과 비용: 정책 프롬프트의 고정 지시문을 만드는 호출")
+    instructions = build_instructions(documents, variant)
     fingerprint = hashlib.sha256(instructions.encode("utf-8")).hexdigest()[:16]
     # 같은 정책과 조건은 같은 키를 사용합니다. 질문이나 현재 시각을 섞지 않습니다.
     return {"instructions": instructions,
@@ -268,9 +304,9 @@ def usage_record(attempt, prices):
     response = attempt.get("response") or {}
     usage = response.get("usage") or {}
     details = usage.get("input_tokens_details") or {}
-    it = _todo("사용량과 비용: usage에서 전체 입력 토큰 읽기. 없으면 None")
-    ot = _todo("사용량과 비용: usage에서 전체 출력 토큰 읽기. 없으면 None")
-    cached = _todo("사용량과 비용: details에서 캐시 읽기 토큰 읽기. 없으면 None")
+    it = usage.get("input_tokens")
+    ot = usage.get("output_tokens")
+    cached = details.get("cached_tokens")
     written = details.get("cache_write_tokens")
     reasoning = (usage.get("output_tokens_details") or {}).get("reasoning_tokens")
     support.validate_usage_counters(it, ot, cached, written, reasoning)
@@ -282,12 +318,22 @@ def usage_record(attempt, prices):
         else:
             if written is None:
                 assumption = "cache_write_tokens absent; assumed zero for estimate"
-            ordinary = _todo("사용량과 비용: 전체 입력에서 캐시 읽기와 쓰기를 뺀 일반 입력 수")
+            ordinary = it - cached - effective_write
             # prices의 단가 키: input, cached, cache_write, output. 백만 토큰당 USD입니다.
-            estimate = _todo("사용량과 비용: 일반 입력, 캐시 읽기, 캐시 쓰기, 출력 비용의 합을 백만으로 나누는 식")
-    observation = _todo("사용량과 비용: cached가 None/양수/0일 때 unavailable/hit/miss를 고르는 식")
+            estimate = (ordinary * prices["input"] + cached * prices["cached"] + effective_write * prices["cache_write"] + ot * prices["output"]) / 1000000
+    if cached is None:
+        observation = "unavailable"
+    elif cached > 0:
+        observation = "hit"
+    elif cached == 0:
+        observation = "miss"
+    # ==========================================================
     # 이유: 캐시와 추론 토큰을 왜 중복 계산하지 않는지,
     # 두 요청의 비용이나 지연 차이를 전부 캐시 효과라 할 수 없는 이유를 적으세요.
+    # ==========================================================
+    # 캐시는 입력 토큰에 속하고, 추론은 출력 토큰에 속하기 때문에 중복 계산하면 비용이 부풀려지기 때문이다.
+    # 캐시를 사용하더라도 출력 양이 많거나 네트워크 상태가 좋지 않으면 비용과 지연에 영향이 갈 수 있다.
+    # ==========================================================
     return support.pack_usage_record(attempt, response, prices, it, ot, cached, written,
                                      reasoning, observation, estimate, assumption)
 

@@ -1,0 +1,71 @@
+{
+  "mode": "fixture",
+  "results": [
+    {
+      "stage": "retry",
+      "name": "호출 재시도: 코드 오류는 재시도하지 않음",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "retry",
+      "name": "호출 재시도: timeout→429→성공",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "retry",
+      "name": "호출 재시도: 503 총 3회 소진",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "retry",
+      "name": "호출 재시도: 400 즉시 중단",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "retry",
+      "name": "호출 재시도: 401 즉시 중단",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "retry",
+      "name": "호출 재시도: 403 즉시 중단",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "retry",
+      "name": "호출 재시도: 404 즉시 중단",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "retry",
+      "name": "호출 재시도: connection/None 후 성공",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "retry",
+      "name": "호출 재시도: http/408 후 성공",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "retry",
+      "name": "호출 재시도: http/409 후 성공",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    },
+    {
+      "stage": "retry",
+      "name": "호출 재시도: http/500 후 성공",
+      "status": "통과",
+      "detail": "fixture 검증 완료"
+    }
+  ]
+}
