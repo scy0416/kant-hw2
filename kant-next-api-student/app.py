@@ -316,7 +316,7 @@ def register_document(store, document):
 def build_prompt(question, documents):
     # 모델 연결: 질문과 문서: question과 selected를 각각 question, documents 키에 담으세요.
     selected = [document.model_dump() if isinstance(document, BaseModel) else dict(document) for document in documents]
-    input_text = json.dumps(support.todo("모델 연결: 질문과 문서"), ensure_ascii=False)
+    input_text = json.dumps({"question": question, "documents": selected})
     return POLICY_INSTRUCTIONS, input_text
 
 
@@ -336,16 +336,21 @@ async def call_model_once(client, question, documents, config):
     )
     response.raise_for_status()
     text = support.extract_output(response.json())
-    reply = QueryReply.model_validate(support.todo("모델 연결: 응답 JSON"))
+    reply = QueryReply.model_validate(json.loads(text))
     selected_ids = {document.doc_id if isinstance(document, BaseModel) else document["doc_id"] for document in documents}
-    if support.todo("모델 연결: 출처 검사"):
+    if set(reply.source_ids) - set(selected_ids):
         raise ValueError("선택하지 않은 문서를 출처로 반환했습니다.")
     return reply
 
 
 # 실패 처리. 시도 전체의 종료 시한도 HTTP 단계별 timeout과 같은 규칙으로 처리합니다.
 async def query_with_retry(client, question, documents, config, *, sleep=asyncio.sleep):
+    # ==========================================================
     # 작성 메모: await로 기다리는 이유와 두 번까지만 시도하는 이유를 1~2줄로 적으세요.
+    # ==========================================================
+    # await으로 기다리지 않으면 여러 번 재시도하는 동안 서버 프로세스가 계속 대기를 할 수 있기 때문에 await을 사용한다.
+    # 너무 많은 시도를 한다면 비용 문제 및 과하게 많은 호출이 발생할 수 있기 때문에 2번까지 시도한다.
+    # ==========================================================
     # attempt는 첫 시도에서 0, 두 번째 시도에서 1입니다.
     # 실패 처리: timeout 재시도: timeout이 첫 시도에서 발생했을 때만 다시 요청합니다.
     # 실패 처리: HTTP 재시도: 첫 시도의 500~599 응답만 다시 요청합니다.
@@ -356,17 +361,17 @@ async def query_with_retry(client, question, documents, config, *, sleep=asyncio
                 call_model_once(client, question, documents, config), config["attempt_timeout"],
             )
         except (TimeoutError, httpx.TimeoutException):
-            if support.todo("실패 처리: timeout 재시도"):
+            if attempt == 0:
                 await sleep(config["retry_delay"])
                 continue
             raise HTTPException(status_code=504, detail="모델 응답 제한 시간을 초과했습니다.") from None
         except httpx.HTTPStatusError as exc:
             status = exc.response.status_code
-            if support.todo("실패 처리: HTTP 재시도"):
+            if attempt == 0 and 500 <= status <= 599:
                 await sleep(config["retry_delay"])
                 continue
             if status == 429:
-                raise HTTPException(status_code=support.todo("실패 처리: 공급자 429"), detail="모델 공급자의 호출 한도에 도달했습니다.") from None
+                raise HTTPException(status_code=503, detail="모델 공급자의 호출 한도에 도달했습니다") from None
             raise HTTPException(status_code=502, detail="모델 공급자가 정상 응답을 반환하지 않았습니다.") from None
         except httpx.RequestError:
             raise HTTPException(status_code=502, detail="모델 공급자에 연결하지 못했습니다.") from None
@@ -380,12 +385,12 @@ def admit_query(state, now, *, limit=30, window=60):
     # 요청 제한: 구간 갱신: 첫 요청이거나 현재 구간이 window초 이상 지났는지 판단합니다.
     # 요청 제한: 한도 확인: 현재 count가 limit에 도달했는지 판단합니다.
     # 요청 제한: 요청 수 증가: 허용한 사용자 요청 한 건을 셉니다. 모델 재시도는 여기로 돌아오지 않습니다.
-    if support.todo("요청 제한: 구간 갱신"):
+    if state["start"] is None or now - state["start"] >= window:
         state["start"] = now
         state["count"] = 0
-    if support.todo("요청 제한: 한도 확인"):
+    if state["count"] >= limit:
         return max(1, math.ceil(window - (now - state["start"])))
-    state["count"] += support.todo("요청 제한: 요청 수 증가")
+    state["count"] += 1
     return 0
 
 
@@ -397,7 +402,13 @@ async def request_logging(request, call_next, *, mode, logger):
     started_at = time.monotonic()
     response = await call_next(request)
     elapsed_ms = round((time.monotonic() - started_at) * 1000, 3)
-    fields = support.todo("기록: 로그 필드")
+    fields = {
+        "method": request.method,
+        "path": support.safe_route(request),
+        "status": response.status_code,
+        "mode": mode,
+        "elapsed_ms": elapsed_ms,
+    }
     logger.info(json.dumps(fields, ensure_ascii=False))
     response.headers["X-DevDesk-Mode"] = mode
     return response
