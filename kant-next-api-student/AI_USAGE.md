@@ -11,10 +11,10 @@ AI는 개념 질문과 직접 작성한 코드의 디버깅에만 사용할 수 
 
 ## 사용 여부
 
-- 사용 여부: 사용 (필수 1 자료 수집, 필수 2 문서 정제, 필수 3 문서 API. 필수 4와 선택 심화는 아직 진행하지 않음)
+- 사용 여부: 사용 (필수 1 자료 수집, 필수 2 문서 정제, 필수 3 문서 API, 필수 4 질문 API. 선택 심화는 진행하지 않음)
 - 사용한 도구: Claude Code (Claude Sonnet 5.5, claude-sonnet-5-5)
 
-AI는 과제 분석, 테스트 방법 설명, 제가 작성한 코드의 오류 원인 지적과 검토에만 사용했습니다. `collect_releases`, `normalize_releases`, 필수 3의 모델 필드와 `find_document`, `register_document`, `response_models`의 코드와 `작성 메모`는 AI가 써 주지 않았고 제가 직접 작성했습니다. 이 표는 대화 내용을 바탕으로 AI(Claude Code)가 정리했고, 저는 사실과 맞는지 확인했습니다. 날짜는 대화 시점 기준이며 자정을 넘긴 작업은 `10-20~21`로 적었습니다.
+AI는 과제 분석, 테스트 방법 설명, 제가 작성한 코드의 오류 원인 지적과 검토에만 사용했습니다. `collect_releases`, `normalize_releases`, 필수 3의 모델 필드와 `find_document`, `register_document`, `response_models`, 필수 4의 `build_prompt`, `call_model_once`, `query_with_retry`, `admit_query`, `request_logging`의 코드와 `작성 메모`는 AI가 써 주지 않았고 제가 직접 작성했습니다. 이 표는 대화 내용을 바탕으로 AI(Claude Code)가 정리했고, 저는 사실과 맞는지 확인했습니다. 날짜는 대화 시점 기준이며 자정을 넘긴 작업은 `10-20~21`로 적었습니다.
 
 ## 도움 기록
 
@@ -32,3 +32,4 @@ AI는 과제 분석, 테스트 방법 설명, 제가 작성한 코드의 오류 
 | 2026-10-21, 필수 3 문서 API | 모델 필드 9개와 `find_document`, `register_document`, `response_models`를 작성함. 메모의 요구가 무엇인지 이해하지 못함 | 필수 3번 다 했어. 확인해봐주고, "GET/POST의 입력 위치와 없는 ID/잘못된 입력의 차이를 1~2줄로 적으세요."이게 뭘 작성하라는건지 이해 못하겠으니까 뭘 적으라는건지 좀 알려줘 | AI가 `check document-api`를 실행해 `support.LIMITS["source_id"]`의 `KeyError`(키는 `source_url`)가 모듈 전체를 로드하지 못하게 하고 있다고 지적함. 나머지 모델과 함수는 정적으로 읽어 요구와 맞다고 확인함. 메모가 요구하는 것을 설명함. (1) 입력 위치는 GET이 URL 경로의 문자열, POST가 요청 본문 JSON이라는 점. (2) 없는 ID는 요청 형식은 맞고 대상이 없어서 404(`find_document`가 저장소 조회로 결정), 잘못된 입력은 요청 자체가 규칙 위반이라 422(pydantic이 함수 호출 전에 거부), 중복 등록은 409라는 점. 메모 문장은 제공하지 않음. | `Document.source_url`의 `LIMITS` 키를 직접 수정함. 메모 두 줄을 직접 작성함. | `check document-api` 시작 불가(`KeyError`) → 7개 중 7개 통과 |
 | 2026-10-21, 필수 3 문서 API | 키를 고친 뒤 다시 확인을 원함 | 다시 확인해봐줘 | AI가 `check document-api` 7/7 통과를 확인함. 서버를 직접 호출해 과제 표의 응답(health 200 `document_count: 9`, 등록 201, 단건 조회 200, 없는 ID 404, 같은 ID 또는 URL 409, `manual/a`와 누락, 자료형, 빈 값, 추가 필드, 없는 `category` 422, `title` 300자 201과 301자 422, `/query` 501)을 확인함. 메모 둘째 줄에서 GET의 잘못된 입력도 404라고 쓴 부분이 부정확하며 잘못된 입력은 422라고 지적함. | 메모의 둘째 줄 보강은 이후 진행. 아직 반영하지 않음. | `check document-api` 7/7 통과 |
 | 2026-10-21, 기록 정리 | 필수 4와 선택 심화는 다음에 진행하기로 함 | 일단 나머지는 다음에 하게 지금까지의 대화들을 AI_USAGE.md를 채워넣어줘 | 이 표를 AI가 대화 내용을 바탕으로 정리함. 정리하면서 `artifacts/live/`에 `run documents --live` 결과가 생성된 것을 확인함(입력 10, 채택 10, 격리 0, 제외 0). | `AI_USAGE.md` 작성 | 실행 없음 |
+| 2026-10-21, 필수 4 질문 API | 필수 4의 `support.todo`를 모두 작성한 뒤 검사 결과를 확인하고 싶었음 | 필수4의 todo를 전부 작성한거 같은데 확인해줘 | AI가 `check query`(6개 중 1개 실패), `check retry`(17개 중 3개 실패), `check observe`(6개 중 3개 실패)를 실행해 원인을 지적함. (1) `call_model_once`에서 모델 응답 `text`가 JSON 문자열인데 `json.loads` 없이 `model_validate`에 넘겨 `ValidationError`가 남. (2) 선택하지 않은 출처를 검사하는 조건이 `not`으로 거꾸로 되어 정상 응답이 거부됨. 이 두 곳 때문에 성공해야 할 시나리오가 502가 되어 `check retry`의 성공 시나리오 3개와 `check observe`의 동시 요청 항목이 실패하는 것으로 설명함. `admit_query`는 설명과 맞다고 확인함. `build_prompt`의 `ensure_ascii=False` 누락, `작성 메모`의 "await로 기다리는 이유" 문장이 반대로 읽히는 점도 짚음. 수정 코드는 제공하지 않음. | `call_model_once`: 응답 JSON을 읽는 부분과 출처 검사 조건을 직접 수정함. | `check query` 6/6, `check retry` 17/17, `check observe` 6/6 통과 (fixture). 실제 모델 호출(live)은 아직 확인하지 않음. |
