@@ -164,10 +164,10 @@ def commit_history(store, session_id, question, outcome):
 # 필수 4: 실패 복구
 def build_resilient_chain(primary):
     """실패 복구: 허용 오류에만 처음을 포함해 최대 두 번 시도합니다."""
-    retry = todo("실패 복구: primary.with_retry에 retry_if_exception_type=support.RECOVERABLE, stop_after_attempt=2, wait_exponential_jitter=False를 적용하세요.")
+    retry = primary.with_retry(retry_if_exception_type=support.RECOVERABLE, stop_after_attempt=2, wait_exponential_jitter=False)
     fallback = RunnableLambda(lambda value: {"reply": support.safe_answer("fallback"),
                                             "route": "fallback"}).with_config(run_name="fallback")
-    return todo("실패 복구: retry.with_fallbacks에 [fallback]과 exceptions_to_handle=support.RECOVERABLE을 연결하세요.")
+    return retry.with_fallbacks([fallback], exceptions_to_handle=support.RECOVERABLE)
 
 
 # 필수 5: 스트리밍
