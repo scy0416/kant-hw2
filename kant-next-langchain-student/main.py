@@ -32,7 +32,7 @@ def to_documents(rows, keywords):
         metadata = {key: copy.deepcopy(value) for key, value in row.items() if key != "body"}
         defaults = ["uv", "릴리스", "release"] if row["category"] == "release" else []
         metadata["keywords"] = list(keywords.get(row["doc_id"], defaults))
-        document = todo("문서 변환: row의 body와 metadata로 Document를 만드세요.")
+        document = Document(page_content=row["body"], metadata=metadata)
         documents.append(document)
     return documents
 
@@ -45,10 +45,10 @@ def search_documents(query, documents, allowed_ids, top_k=3):
     allowed = set(allowed_ids)
     scored = []
     for index, document in enumerate(documents):
-        if todo("키워드 검색: 이 문서의 doc_id가 allowed 밖에 있나요?"):
+        if document.metadata["doc_id"] not in allowed:
             continue
         words = {word.casefold() for word in document.metadata.get("keywords", []) if word.strip()}
-        score = todo("키워드 검색: words 중 normalized에 포함된 키워드의 개수를 구하세요.")
+        score = len([word for word in words if word in normalized])
         if score > 0:
             scored.append((score, index, document))
     scored.sort(key=lambda item: (-item[0], item[1]))
@@ -67,9 +67,14 @@ def format_context(documents):
 
 def build_context_chain(documents):
     """검색 입력 연결: 입력 보존과 검색을 병렬로 연결합니다."""
+
+    # ==========================================================
     # 작성 이유: 입력 보존과 검색을 나누는 이유를 한두 줄로 적으세요.
+    # ==========================================================
+    # 직렬로 이으면 서로의 결과를 보존할 수 없지만 병렬로 실행 후 모든 결과를 한 번에 합치면 다음 단계에 한 번에 보낼 수 있기 때문이다.
+    # ==========================================================
     def retrieve(value):
-        query = todo("검색 입력 연결: support.search_query에 question과 history를 전달하세요.")
+        query = support.search_query(value["question"], value["history"])
         return search_documents(query, documents, value["document_ids"])
 
     def merge(value):
@@ -78,17 +83,19 @@ def build_context_chain(documents):
 
     preserve = RunnablePassthrough().with_config(run_name="preserve_input")
     retrieve_chain = RunnableLambda(retrieve).with_config(run_name="retrieve")
-    parallel = todo("검색 입력 연결: original=preserve, documents=retrieve_chain을 RunnableParallel로 묶으세요.")
+    parallel = RunnableParallel(original=preserve, documents=retrieve_chain)
     return parallel.with_config(run_name="parallel_prepare") | RunnableLambda(merge).with_config(run_name="merge_context")
 
 
 # 필수 2: 기본 체인
 def build_prompt_and_parser():
     """프롬프트와 파서: 답변 형식과 이전 대화 자리를 연결합니다."""
-    parser = todo("프롬프트와 파서: support.Answer용 PydanticOutputParser를 만드세요.")
+    #parser = todo("프롬프트와 파서: support.Answer용 PydanticOutputParser를 만드세요.")
+    parser = PydanticOutputParser(pydantic_object=support.Answer)
     prompt = ChatPromptTemplate.from_messages([
         ("system", "{policy}\n\n출력 형식:\n{format_instructions}\n\n이번 검색 문서:\n{context}"),
-        todo("프롬프트와 파서: history용 MessagesPlaceholder를 넣으세요."),
+        #todo("프롬프트와 파서: history용 MessagesPlaceholder를 넣으세요."),
+        MessagesPlaceholder("history"),
         ("human", "{question}"),
     ]).partial(policy=POLICY_INSTRUCTIONS, format_instructions=parser.get_format_instructions())
     return prompt.with_config(run_name="prompt"), parser.with_config(run_name="parser")
@@ -98,11 +105,14 @@ def validate_sources(answer, documents):
     """출처 검사: 이번에 검색한 문서만 출처로 허용합니다."""
     answer = support.Answer.model_validate(answer)
     allowed = {document.metadata["doc_id"] for document in documents}
-    if todo("출처 검사: source_ids에 중복이 있나요?"):
+    #if todo("출처 검사: source_ids에 중복이 있나요?"):
+    if len(answer.source_ids) != len(set(answer.source_ids)):
         raise support.SourceValidationError("출처가 중복됩니다.")
-    if todo("출처 검사: source_ids에 allowed 밖의 ID가 있나요?"):
+    #if todo("출처 검사: source_ids에 allowed 밖의 ID가 있나요?"):
+    if any(sid not in allowed for sid in answer.source_ids):
         raise support.SourceValidationError("이번 검색 결과에 없는 출처입니다.")
-    if todo("출처 검사: 출처가 없는데 needs_human이 false인가요?"):
+    #if todo("출처 검사: 출처가 없는데 needs_human이 false인가요?"):
+    if not answer.source_ids and not answer.needs_human:
         raise support.SourceValidationError("근거 없는 답변에는 담당자 확인이 필요합니다.")
     return answer
 
@@ -110,10 +120,12 @@ def validate_sources(answer, documents):
 def build_primary_chain(model):
     """기본 체인 연결: prompt, model, parser와 출처 검사를 연결합니다."""
     prompt, parser = build_prompt_and_parser()
-    generate = todo("기본 체인 연결: prompt, model, parser를 순서대로 |로 연결하세요.")
+    #generate = todo("기본 체인 연결: prompt, model, parser를 순서대로 |로 연결하세요.")
+    generate = prompt | model | parser
 
     def finish(value):
-        answer = todo("기본 체인 연결: parsed와 documents를 validate_sources로 검사하세요.")
+        #answer = todo("기본 체인 연결: parsed와 documents를 validate_sources로 검사하세요.")
+        answer = validate_sources(value["parsed"], value["documents"])
         return {"reply": answer, "route": "primary"}
 
     return (RunnablePassthrough.assign(parsed=generate.with_config(run_name="generate_parse"))
@@ -128,7 +140,8 @@ def build_answer_chain(model, reliable=False):
     no_documents = RunnableLambda(lambda value: {"reply": support.safe_answer("no_documents"),
                                                 "route": "no_documents"})
     def has_no_documents(value):
-        return todo("문서 없음 분기: value의 documents가 비어 있는지 확인하세요.")
+        #return todo("문서 없음 분기: value의 documents가 비어 있는지 확인하세요.")
+        return not value["documents"]
     return RunnableBranch((has_no_documents, no_documents), primary).with_config(run_name="route_by_documents")
 
 
