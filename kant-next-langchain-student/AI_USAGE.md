@@ -6,10 +6,17 @@
 
 | 구분 | 질문 요약 | 공유한 자기 코드와 오류 범위 | 이해한 내용 | 직접 수정하고 검증한 결과 |
 |---|---|---|---|---|
-| 개념 또는 디버깅 | 작성 | 작성 | 작성 | 작성 |
+| 개념, 과제 분석 | "이제 랭체인 파트 진행하자" (과제 파악 요청) | 코드 공유 없음. 작성 전의 `main.py`와 `ASSIGNMENT.md`, `README.md`, `DATA_CARD.md`를 AI가 읽음 | 필수 5문제와 선택 1문제의 구조, 각 문제의 빈칸 위치, 작성 주석 세 곳(`build_context_chain`의 작성 이유, `commit_history`의 작성 이유, `stream_answer`의 관측 메모)을 파악함. `|`로 이어 붙이는 Runnable, `RunnableParallel`, `prompt \| model \| parser`, `.with_retry()`와 `.with_fallbacks()`, `.stream()`과 콜백이라는 LangChain 개념을 문제별로 대응시켜 이해함. 이전 과제의 `validate_answer`, 재시도, 로그 필드와 비슷한 부분을 연결함. | 수정 없음. `uv sync --frozen`과 `demo`로 환경을 확인하도록 안내받음 |
+| 디버깅 확인 | "필수 1이 문제 없이 통과했는지 확인해줘" | 필수 1의 `to_documents`, `search_documents`, `build_context_chain`. AI가 `check search`와 `run search`를 실행함 | `check search` 7개 통과와 `run search` 5개 사례의 `actual_ids`가 `expected_ids`와 일치함을 확인함(동점 처리, 허용 후보 선필터, 0점 제외 포함). 키워드 검색은 동의어와 띄어쓰기를 이해하지 못하는 한계가 있음을 이해함. AI가 `search_documents` 안에 디버깅용 `print`가 남아 있다고 지적함. `build_context_chain`의 작성 이유가 비어 있음도 알려 줌. 두 작업이 서로의 결과를 필요로 하는지, 검색 함수를 교체해도 나머지 연결이 유지되는지를 생각하라는 방향만 안내받음. | `print`를 직접 삭제함. 작성 이유 주석을 직접 작성함. `check search` 7/7 통과 |
+| 디버깅 확인 | "필수 2가 문제없이 통과했는지 확인해줘" | 필수 2의 `build_prompt_and_parser`, `validate_sources`, `build_primary_chain`, `build_answer_chain`. AI가 `check chain`과 `run chain`을 실행함 | `check chain` 13개 통과와 `run chain`의 `route: primary` 확인. 오류 입력(잘못된 JSON, 없는 필드, 추가 필드, boolean 문자열, 빈 답변, release 범주, 중복 출처, 미검색 출처, 출처 없는 해결 응답)이 모두 거부되는 것으로 `validate_sources`의 세 조건이 맞다고 이해함. 필수 1의 작성 이유가 "직렬이면 결과를 보존할 수 없다"는 점은 맞지만 "서로의 결과를 필요로 하지 않는다"는 점과 "검색 함수만 교체 가능"이라는 점이 빠져 있다는 설명을 들음. `run chain --live`를 아직 하지 않았음을 알림. | 작성 이유 보강은 필수가 아니라는 안내를 받음. 주석은 아직 수정하지 않음. `check chain` 13/13 통과 |
+| 디버깅 확인 | "필수 3 문제없이 구현되었는지 확인해줘" | 필수 3의 `get_history`, `commit_history`. AI가 `check history`와 `run history`를 실행함 | `check history` 4개 통과와 `run history`에서 A 4개, B 2개 메시지를 확인함. 문서 없음, fallback, 중단된 스트림이 이력에 남지 않는 이유를 이해함. 작성 이유의 "primary가 아닌 경우는 문서가 검색되지 않은 잘못된 경우"는 `no_documents`만 설명하고 `fallback`과 중단된 스트림을 설명하지 못한다는 지적을 받음. 문서(매 질문마다 새로 검색하는 근거)와 이력(세션을 따라 쌓이는 문맥)의 역할 차이, 확정되지 않은 안내를 저장하면 후속 질문이 그것을 실제 답변처럼 이어받는다는 점을 이해함. | `commit_history`의 작성 이유를 "문서가 검색되지 않거나 문제가 발생해 확정된 답변이 아닌 경우"로 직접 수정함. `check history` 4/4 통과. `run history --live`는 아직 실행하지 않음 |
+| 디버깅 확인 | "필수 4 문제없이 구현되었는지 확인해줘" | 필수 4의 `build_resilient_chain`. AI가 `check recovery`와 `run recovery`를 실행함 | `check recovery` 13개 통과와 세 사례(일시 장애 후 성공 2회, 스키마 오류 후 성공 2회, 두 번 실패 후 fallback)가 과제 표와 일치함을 확인함. `with_retry`와 `with_fallbacks` 양쪽에 `support.RECOVERABLE`을 지정해서 인증, 설정, `TypeError`가 재시도와 fallback을 거치지 않고 전달되는 이유를 이해함. `Exception` 전체를 재시도 대상으로 넣으면 안 되는 이유(인증 오류 재시도 방지)도 이해함. 이 단계에는 작성 주석이 없음. | 수정 없음. `check recovery` 13/13 통과 |
+| 기록 정리 | "일단 지금까지 한거에 대해서 AI_USAGE.md에 작성해줘" | 코드 공유 없음 | 필수 1~4의 사용 기록을 AI가 대화 내용을 바탕으로 정리함. 정리하면서 현재 `main.py`의 작성 주석 상태와 live 결과 폴더가 없다는 것을 확인함. | `AI_USAGE.md` 작성. 필수 5와 선택 심화는 아직 진행하지 않음 |
 
-도구와 모델 이름:
+도구와 모델 이름: Claude Code (Claude Sonnet 5.5, claude-sonnet-5-5). 사용 범위는 필수 1~4의 분석, 개념 설명, 작성한 코드의 검사 실행과 오류 지적이며, 필수 5와 선택 심화는 아직 진행하지 않았습니다. 이 표는 AI가 대화 내용을 바탕으로 정리했고, 저는 사실과 맞는지 확인해야 합니다.
 
-AI의 설명이 틀렸거나 그대로 적용하지 않은 부분:
+AI의 설명이 틀렸거나 그대로 적용하지 않은 부분: 현재까지 AI의 설명이 틀린 것으로 확인한 부분은 없습니다. 그대로 적용하지 않은 부분은 두 가지입니다. (1) 필수 1의 작성 이유에 "서로의 결과를 필요로 하지 않음"과 "검색 함수 교체"를 더하라는 보강 제안은 아직 반영하지 않았습니다. (2) 필수 3의 작성 이유는 지적을 받은 뒤 `fallback`과 중단된 스트림까지 포함하도록 직접 고쳤지만, "문서와 이력의 역할 차이"를 설명하는 부분은 보강 여지가 남아 있습니다.
 
-최종 코드와 설명을 스스로 설명할 수 있는지 확인:
+최종 코드와 설명을 스스로 설명할 수 있는지 확인: (제출 전에 직접 확인하고 작성하세요. `|`로 이어 붙인 체인의 데이터 흐름, `RunnableParallel`이 만드는 `original`과 `documents` 키, `with_retry`와 `with_fallbacks`의 순서와 예외 목록을 자기 말로 설명할 수 있어야 합니다.)
+
+아직 남은 것: `run chain --live`와 `run history --live`의 실제 모델 실행 확인, 필수 5(스트리밍과 `TraceHandler`, `stream_answer`의 관측 메모), 선택 심화(`review_draft`).
