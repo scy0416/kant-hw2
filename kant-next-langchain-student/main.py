@@ -90,11 +90,9 @@ def build_context_chain(documents):
 # 필수 2: 기본 체인
 def build_prompt_and_parser():
     """프롬프트와 파서: 답변 형식과 이전 대화 자리를 연결합니다."""
-    #parser = todo("프롬프트와 파서: support.Answer용 PydanticOutputParser를 만드세요.")
     parser = PydanticOutputParser(pydantic_object=support.Answer)
     prompt = ChatPromptTemplate.from_messages([
         ("system", "{policy}\n\n출력 형식:\n{format_instructions}\n\n이번 검색 문서:\n{context}"),
-        #todo("프롬프트와 파서: history용 MessagesPlaceholder를 넣으세요."),
         MessagesPlaceholder("history"),
         ("human", "{question}"),
     ]).partial(policy=POLICY_INSTRUCTIONS, format_instructions=parser.get_format_instructions())
@@ -105,13 +103,10 @@ def validate_sources(answer, documents):
     """출처 검사: 이번에 검색한 문서만 출처로 허용합니다."""
     answer = support.Answer.model_validate(answer)
     allowed = {document.metadata["doc_id"] for document in documents}
-    #if todo("출처 검사: source_ids에 중복이 있나요?"):
     if len(answer.source_ids) != len(set(answer.source_ids)):
         raise support.SourceValidationError("출처가 중복됩니다.")
-    #if todo("출처 검사: source_ids에 allowed 밖의 ID가 있나요?"):
     if any(sid not in allowed for sid in answer.source_ids):
         raise support.SourceValidationError("이번 검색 결과에 없는 출처입니다.")
-    #if todo("출처 검사: 출처가 없는데 needs_human이 false인가요?"):
     if not answer.source_ids and not answer.needs_human:
         raise support.SourceValidationError("근거 없는 답변에는 담당자 확인이 필요합니다.")
     return answer
@@ -120,11 +115,9 @@ def validate_sources(answer, documents):
 def build_primary_chain(model):
     """기본 체인 연결: prompt, model, parser와 출처 검사를 연결합니다."""
     prompt, parser = build_prompt_and_parser()
-    #generate = todo("기본 체인 연결: prompt, model, parser를 순서대로 |로 연결하세요.")
     generate = prompt | model | parser
 
     def finish(value):
-        #answer = todo("기본 체인 연결: parsed와 documents를 validate_sources로 검사하세요.")
         answer = validate_sources(value["parsed"], value["documents"])
         return {"reply": answer, "route": "primary"}
 
@@ -140,7 +133,6 @@ def build_answer_chain(model, reliable=False):
     no_documents = RunnableLambda(lambda value: {"reply": support.safe_answer("no_documents"),
                                                 "route": "no_documents"})
     def has_no_documents(value):
-        #return todo("문서 없음 분기: value의 documents가 비어 있는지 확인하세요.")
         return not value["documents"]
     return RunnableBranch((has_no_documents, no_documents), primary).with_config(run_name="route_by_documents")
 
@@ -151,17 +143,21 @@ def get_history(store, session_id):
     if not isinstance(session_id, str) or not session_id.strip():
         raise ValueError("session_id는 비어 있지 않은 문자열입니다.")
     if session_id not in store:
-        store[session_id] = todo("세션 이력: 새 InMemoryChatMessageHistory를 만드세요.")
+        store[session_id] = InMemoryChatMessageHistory()
     return store[session_id]
 
 
 def commit_history(store, session_id, question, outcome):
     """이력 저장: 완료된 primary의 질문과 답변만 저장합니다."""
+    # ==========================================================
     # 작성 이유: 검색 문서와 대화 이력을 구분하고 primary만 저장하는 이유를 적으세요.
-    if todo("이력 저장: outcome의 route가 primary가 아닌가요?"):
+    # ==========================================================
+    # 검색된 문서와 대화 이력은 따로 관리되어야 하는 주체이며, primary가 아닌 경우는 문서가 검색되지 않거나 문제가 발생된 확정된 답변이 아니기 때문에 저장하지 않는다.
+    # ==========================================================
+    if outcome["route"] != "primary":
         return
     answer = support.Answer.model_validate(outcome["reply"])
-    messages = todo("이력 저장: question의 HumanMessage, answer.answer의 AIMessage 순서로 목록을 만드세요.")
+    messages = [HumanMessage(content=question), AIMessage(content=answer.answer)]
     get_history(store, session_id).add_messages(messages)
 
 
