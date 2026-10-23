@@ -173,7 +173,11 @@ def build_resilient_chain(primary):
 # 필수 5: 스트리밍
 def stream_answer(prepared, model, config=None):
     """청크 전달: 아래 순서대로 청크 전달, 검증과 실패 분기를 채웁니다."""
+    # ==========================================================
     # 관측 메모: 실행 기록에서 확인한 실패 단계와 처리 결과를 한두 줄로 적으세요.
+    # ==========================================================
+    # 확인 결과 첫 답변을 만들고서 reset 처리 후 텍스트를 삭제한 후에 final fallback처리를 했다.
+    # ==========================================================
     if not prepared["documents"]:
         yield {"type": "final", "reply": support.safe_answer("no_documents").model_dump(), "route": "no_documents"}
         return
@@ -181,7 +185,7 @@ def stream_answer(prepared, model, config=None):
     stream_chain = prompt | model
     sent_delta = False
     for attempt in range(2):
-        iterator = todo("청크 전달: stream_chain.stream에 prepared와 config를 전달하세요.")
+        iterator = stream_chain.stream(prepared, config=config)
         parts = []
         try:
             for chunk in iterator:
@@ -189,17 +193,17 @@ def stream_answer(prepared, model, config=None):
                 if text:
                     parts.append(text)
                     sent_delta = True
-                    yield todo("청크 전달: text를 담은 delta 이벤트 dict를 만드세요.")
+                    yield {"type": "delta", "text": text}
             parsed = parser.invoke("".join(parts), config=config)
-            answer = todo("청크 전달: parsed와 이번 documents로 출처를 검사하세요.")
-            yield todo("청크 전달: answer.model_dump()를 담은 final primary 이벤트를 만드세요.")
+            answer = validate_sources(parsed, prepared["documents"])
+            yield {"type": "final", "reply": answer.model_dump(), "route": "primary"}
             return
         except support.RECOVERABLE:
-            if todo("실패 처리: 아직 delta를 보내지 않았고 첫 시도인가요?"):
+            if not sent_delta and attempt == 0:
                 continue
             if sent_delta:
-                yield todo("실패 처리: reason이 unverified_output인 reset 이벤트를 만드세요.")
-            yield todo("실패 처리: support.safe_answer('fallback')을 담은 final fallback 이벤트를 만드세요.")
+                yield {"type": "reset", "reason": "unverified_output"}
+            yield {"type": "final", "reply": support.safe_answer("fallback").model_dump(), "route": "fallback"}
             return
         except Exception:
             if sent_delta:
@@ -225,7 +229,7 @@ class TraceHandler(BaseCallbackHandler):
     def _start(self, kind, run_id, parent_run_id, name):
         with self.sink.lock:
             key = str(run_id)
-            state = {"started": todo("실행 기록: self.clock()으로 시작 시각을 읽으세요."),
+            state = {"started": self.clock(),
                      "stage": support.safe_stage(name),
                      "parent_run_id": str(parent_run_id) if parent_run_id else None, "chunk_count": 0}
             self.active[key] = state
@@ -241,8 +245,8 @@ class TraceHandler(BaseCallbackHandler):
             state = self.active.pop(key, None)
             if state is None:
                 return
-            elapsed_ms = todo("실행 기록: self.clock()과 state['started']의 차이를 밀리초로 계산하세요.")
-            error_type = todo("실행 기록: 오류가 있으면 예외 클래스 이름, 없으면 None을 선택하세요.")
+            elapsed_ms = (self.clock() - state["started"]) * 1000
+            error_type = error.__class__.__name__ if error else None
             self.sink.write({"event": f"{kind}_{'error' if error is not None else 'end'}",
                              "stage": state["stage"], "run_id": key,
                              "parent_run_id": state["parent_run_id"], "mode": self.mode,
@@ -257,7 +261,7 @@ class TraceHandler(BaseCallbackHandler):
             state = self.active.get(str(run_id))
             if state is None:
                 return
-            state["chunk_count"] = todo("실행 기록: 현재 청크 개수에 이번 텍스트 청크 한 개를 더하세요.")
+            state["chunk_count"] = state["chunk_count"] + 1
             self.sink.write({"event": "model_chunk", "stage": state["stage"], "run_id": str(run_id),
                              "parent_run_id": state["parent_run_id"], "mode": self.mode,
                              "elapsed_ms": max(0.0, (self.clock() - state["started"]) * 1000),
