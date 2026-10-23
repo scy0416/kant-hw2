@@ -33,7 +33,23 @@ def build_instructions(documents, variant):
     #==========================================================
     # Few-shot 프롬프팅은 모델에게 특정한 구조로 출력해야할 때 주로 사용하고 Self-Consistency는 답이 정해져 있어 모델이 같은 질문을 여러 번 하여 가장 일관적인 답을 선택해야 하는 경우에 사용한다.
     # 이번 경우에 Reasoning을 사용한 이유는 이 프롬프트는 instructions 프롬프트로 모델의 전반적인 동작에 대한 제약을 담당하기 때문에 검토를 통해서 제약 준수 수준을 높이기 위함이다.
-    # 그러나 애초에 잘못된 문서가 전달되는 상황과 여러 번의 검토가 필요한 상황에서는 Reasoning으로 유의미한 결과를 내지 못할 수 있다.
+    # 그러나 애초에 잘못된 문서가 전달되는 상황과 여러 번의 검토가 필요한 상황에서는 Reasoning으로 유의미한 결과를 내지 못할 수 있고, 애초에 검토하는 자료의 양이 적다는 한계가 존재한다.
+    # ==========================================================
+
+    # ==========================================================
+    # 문제가 발생했던 부분: Q03(최신 릴리스 적용)의 needs_human이 true로 나옴(기대 false)
+    # ==========================================================
+    # "문서나 도구 결과만으로 사용자의 요구사항을 해결할 수 없는 경우에는 담당자 확인" => "문서나 도구의 결과로 사용자의 요구사항을 해결할 수 있다면 담당자의 확인이 필요하지 않습니다."
+    # - 문서에 해결의 주체에 대한 정보가 없다면 사용자가 해결 못한다고 판단하는 것으로 분석되어 문서에 해결의 주체에 대한 정보 없이도 판단할 수 있도록 변경하였다.
+    # "문서에 없는 정보를 요구하는 경우에는 담당자 확인" => "사용자가 직접적으로 문서에 없는 정보를 요구하는 경우에는 담당자 확인으로 안내하세요."
+    # - 모델이 스스로 사용자에게 필요한 정보를 찾고자 하는 것으로 판단하여 사용자의 요청에 의한 정보만을 대상으로 하도록 변경하였다.
+    # "자체적으로 해결할 수 있는 요청에는 담당자 확인이 필요 없습니다" => "사용자가 담당자의 도움 없이 자체적으로 해결할 수 있는 요청에는 담당자 확인이 필요 없습니다."
+    # - 해결할 수 있는 상황에 대한 정의가 모호하다고 판단하여 명확하게 "사용자가 담당자의 도움 없이 자체적으로 해결할 수 있는"으로 표현을 변경하였다.
+    #
+    # 결과: 바꾼 결과 실제로 true로 나오던 값들이 기대되로 false로 나오게 되었다.
+    # 불일치 2건 -> 0건
+    #
+    # 한계: 과하게 현재 상황에 대한 맞춤 지시문이라는 느낌의 한계가 강하며, 전체적인 공통 규칙을 통해서 제어하는 것 같지 않다는 한계가 있다.
     # ==========================================================
     policy = """
 <policy>
@@ -49,10 +65,10 @@ def build_instructions(documents, variant):
         우회 및 권한 해제같은 보안 정책을 위반한 요청에는 거절 문구와 함께 담당자 확인으로 안내하세요.
         출력 형식은 <output_schema>와 <output_example>을 참고하세요.
         복구 시간, SLA, 호환성 등에 관련된 질문은 근거가 없다면 추측하지 않고 담당자 확인으로 안내하세요.
-        문서나 도구 결과만으로 사용자의 요구사항을 해결할 수 없는 경우에는 담당자 확인으로 안내하세요.
-        문서에 없는 정보를 요구하는 경우에는 담당자 확인으로 안내하세요.
+        문서나 도구의 결과로 사용자의 요구사항을 해결할 수 있다면 담당자의 확인이 필요하지 않습니다.
+        사용자가 직접적으로 문서에 없는 정보를 요구하는 경우에는 담당자 확인으로 안내하세요.
         자체적으로 해결할 수 없는 담당자가 필요한 요청은 담당자 확인으로 안내하세요.
-        자체적으로 해결할 수 있는 요청에는 담당자 확인이 필요 없습니다.
+        사용자가 담당자의 도움 없이 자체적으로 해결할 수 있는 요청에는 담당자 확인이 필요 없습니다.
         오류가 발생하였고, 이미지가 첨부되었을 때, 화면에 실제로 보이는 것을 관찰하고 서술하세요.
         오류가 발생하였고, 이미지가 첨부되었을 때, 화면에 보이지 않는 것을 유추하고 단정하지 마세요.
         인증 설정과 접근 권한에 대한 문제는 담당자 확인으로 안내하세요.
@@ -142,7 +158,6 @@ def finish_answer(send, request, response, known_ids, events):
             reason = "refusal"
         else:
             try:
-                #answer = _todo("답변 검증과 수정: validate_answer에 응답 본문과 known_ids를 전달하는 호출")
                 answer = validate_answer(response.get("output_text"), known_ids)
                 return {"answer": answer, "fallback_reason": None, "repair_used": repair_used}
             except (ValueError, ValidationError) as error:
@@ -166,10 +181,8 @@ def finish_answer(send, request, response, known_ids, events):
                         hint = "중복된 정보입니다. 같은 정보는 한 번만 포함하세요."
                     elif error_kind == "unsupported_answer":
                         hint = "정보가 없으면서 담당자가 확인하지 않는 지원하지 않는 답변입니다. 정보가 없다면 담당자가 확인해야 합니다."
-                    #hint = _todo("답변 검증과 수정: error_kind에 맞는 수정 안내 문자열")
                     repair_used = True
                     support.append_repair_input(request, response, hint)
-                    #response = _todo("답변 검증과 수정: send로 수정 요청을 전송하는 호출")
                     response = send(request)
 
                     continue
@@ -178,7 +191,6 @@ def finish_answer(send, request, response, known_ids, events):
 
 # 필수 3 / 티켓 조회. 티켓 조회 조건과 모델에 돌려줄 값을 정합니다.
 def tool_schema():
-    #parameters = _todo("티켓 조회: ticket_id 하나만 받는 object JSON Schema")
     parameters = {
         "type": "object",
         "properties": {
@@ -333,6 +345,7 @@ def usage_record(attempt, prices):
     # ==========================================================
     # 캐시는 입력 토큰에 속하고, 추론은 출력 토큰에 속하기 때문에 중복 계산하면 비용이 부풀려지기 때문이다.
     # 캐시를 사용하더라도 출력 양이 많거나 네트워크 상태가 좋지 않으면 비용과 지연에 영향이 갈 수 있다.
+    # Q01는 캐시 미스, 비용은 0.000588, 지연은 4895ms로 측정되고, Q02는 캐시 히트에 비용은 0.000199, 지연은 2967ms인데, Q01의 결과가 더 안좋은 이유는 캐시 쓰기 비용에 있다고 볼 수도 있다.
     # ==========================================================
     return support.pack_usage_record(attempt, response, prices, it, ot, cached, written,
                                      reasoning, observation, estimate, assumption)
@@ -344,24 +357,18 @@ def run_pipeline(send, question, documents, tickets, variant="reasoning",
     prices = support.load_prices() if prices is None else prices
     events = []
     started = time.perf_counter()
-    #settings = _todo("전체 기능 연결: cache_settings 호출")
     settings = cache_settings(documents, variant)
     request = support.base_request(settings["instructions"], question, variant)
     request.update(settings)
-    #request["text"] = _todo("전체 기능 연결: 답변 형식을 만드는 함수 호출")
     request["text"] = answer_format()
-    #request["tools"] = [_todo("전체 기능 연결: 도구 규격을 만드는 함수 호출")]
     request["tools"] = [tool_schema()]
     request["parallel_tool_calls"] = False
-    #request["input"][0]["content"] = _todo("전체 기능 연결: 질문과 image_path로 입력을 만드는 함수 호출")
     request["input"][0]["content"] = image_content(question, image_path)
 
     def reliable_send(current_request):
         return call_with_retry(send, current_request, events, sleep=sleep)
 
-    #final_request, response = _todo("전체 기능 연결: tool_roundtrip에 reliable_send, request, tickets, events 전달")
     final_request, response = tool_roundtrip(reliable_send, request, tickets, events)
-    #result = _todo("전체 기능 연결: finish_answer에 reliable_send, final_request, response, 문서 ID 집합, events 전달")
     result = finish_answer(reliable_send, final_request, response, [d["doc_id"] for d in documents], events)
     result["tool_calls"] = sum(event["event"] == "tool_result" for event in events)
     result["logs"] = [usage_record(event, prices) if event["event"] == "api_attempt" else event
