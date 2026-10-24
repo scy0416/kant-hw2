@@ -290,8 +290,19 @@ class TraceHandler(BaseCallbackHandler):
 # 선택 심화 1: 초안 검토
 def review_draft(draft, documents, reviewer, rewriter):
     """선택 심화: 필수에서 만든 검증을 재사용해 검토, 한 번 수정, 재검토 흐름을 설계합니다."""
-    raise NotImplementedError("선택 심화: review_draft를 구현하세요.")
+    reviewed = reviewer({"draft": draft, "documents": documents})
 
+    if reviewed == "keep":
+        return {"reply": draft, "route": "primary"}
+    if reviewed == "revise":
+        rewrote = rewriter({"draft": draft, "documents": documents})
+        validate_sources(rewrote, documents)
+        re_reviewed = reviewer({"draft": rewrote, "documents": documents})
+        if re_reviewed == "keep":
+            return {"reply": rewrote, "route": "primary"}
+        return {"reply": support.safe_answer("fallback"), "route": "fallback"}
+    if reviewed == "human":
+        return {"reply": support.safe_answer("fallback"), "route": "fallback"}
 
 if __name__ == "__main__":
     raise SystemExit(support.main(sys.modules[__name__]))
